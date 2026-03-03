@@ -14,7 +14,6 @@ This document specifies the Graph API queries used by the Knowledge Transfer Age
 | `Calendars.Read` | Application | Read retiree's calendar for meeting patterns |
 | `Sites.Read.All` | Application | Read SharePoint content for document analysis |
 | `Files.Read.All` | Application | Read OneDrive files for document analysis |
-| `Chat.Read.All` | Application | Read Teams chat messages (requires admin consent) |
 | `People.Read.All` | Application | Relationship mapping |
 | `User.Read.All` | Application | Organizational context |
 
@@ -25,7 +24,11 @@ This document specifies the Graph API queries used by the Knowledge Transfer Age
 | `User.Read` | Delegated | Basic user profile |
 | `Chat.ReadWrite` | Delegated | Send/receive bot messages |
 
-> ⚠️ **Note:** `Chat.Read.All` and `Mail.Read` application permissions require admin consent and careful scoping to only the consented retiree.
+> ⚠️ **Teams Chat observation (`Chat.Read.All`) is excluded from MVP scope.**
+> It is a **protected API** requiring formal Microsoft approval (can take weeks) and grants
+> **tenant-wide** chat access — most enterprise IT admins will resist this.
+> **For future phases:** Use **Resource-Specific Consent (RSC)** instead, which allows scoped
+> permission per chat/team without tenant-wide access.
 
 ## Key Queries
 
@@ -90,8 +93,12 @@ GET /users/{retiree-id}/drive/sharedWithMe
 
 ### Teams Activity
 
+> **Excluded from MVP.** Teams chat observation requires `Chat.Read.All` (protected API).
+> Future phases will use RSC for scoped access. See permissions section above.
+
+<!--
 ```http
-# Get chats the retiree participates in
+# Get chats the retiree participates in (requires Chat.Read.All — protected API)
 GET /users/{retiree-id}/chats
   ?$select=id,topic,chatType,lastUpdatedDateTime,members
   &$expand=members($select=displayName,email)
@@ -102,6 +109,7 @@ GET /users/{retiree-id}/chats/{chat-id}/messages
   ?$select=id,body,from,createdDateTime
   &$top=50
 ```
+-->
 
 ## Change Notification Subscriptions
 
@@ -125,8 +133,12 @@ const subscriptions = [
 ];
 
 // Subscription renewal (must renew before expiration)
-// Max lifetime: 3 days for most resources, 1 hour for chat messages
-// Implement a timer-trigger Azure Function to renew subscriptions
+// Max lifetime varies by resource type:
+//   - Messages (mail): 3 days
+//   - Calendar events:  3 days
+//   - Drive (files):    3 days
+//   - Chat messages:    1 HOUR (if added in future phases)
+// Implement a timer-trigger Azure Function to renew all subscriptions
 ```
 
 ## Throttling & Rate Limits

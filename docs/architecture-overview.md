@@ -61,7 +61,7 @@ graph TB
 
     subgraph "Storage"
         SEARCH["Azure AI Search<br/><i>Vector + keyword index</i>"]
-        COSMOS["Azure Cosmos DB<br/><i>Knowledge graph +<br/>conversation history</i>"]
+        COSMOS["Azure Cosmos DB<br/><i>Knowledge graph (Gremlin) +<br/>metadata (NoSQL) —<br/>2 separate accounts</i>"]
         SP["SharePoint<br/><i>Document artifacts</i>"]
     end
 
@@ -225,7 +225,8 @@ graph TB
 
         subgraph "Data"
             SEARCH["Azure AI Search<br/><i>S1 Standard</i>"]
-            COSMOS_D["Azure Cosmos DB<br/><i>Serverless</i>"]
+            COSMOS_NOSQL["Cosmos DB NoSQL<br/><i>Serverless</i>"]
+            COSMOS_GRAPH["Cosmos DB Gremlin<br/><i>Serverless</i>"]
             BLOB["Azure Blob Storage<br/><i>Raw data lake</i>"]
         end
 
@@ -254,10 +255,12 @@ graph TB
 
     FOUNDRY <--> AOAI_D
     FOUNDRY <--> SEARCH
-    FOUNDRY <--> COSMOS_D
+    FOUNDRY <--> COSMOS_NOSQL
+    FOUNDRY <--> COSMOS_GRAPH
     FUNC <--> GRAPH_D
     FUNC <--> SEARCH
-    FUNC <--> COSMOS_D
+    FUNC <--> COSMOS_NOSQL
+    FUNC <--> COSMOS_GRAPH
     FUNC <--> AOAI_D
     FUNC <--> LANG_D
     FOUNDRY <--> TEAMS_D
@@ -269,7 +272,8 @@ graph TB
     AI_MON -.-> FUNC
     LOG -.-> ENTRA_D
     PV -.-> SEARCH
-    PV -.-> COSMOS_D
+    PV -.-> COSMOS_NOSQL
+    PV -.-> COSMOS_GRAPH
 
     style FOUNDRY fill:#2ECC71,color:#fff
     style AOAI_D fill:#0078D4,color:#fff

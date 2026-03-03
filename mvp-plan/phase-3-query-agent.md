@@ -100,12 +100,26 @@ async function searchVectorStore(query: RewrittenQuery): Promise<VectorResult[]>
 async function queryKnowledgeGraph(query: RewrittenQuery): Promise<GraphResult[]> {
   if (!query.graphQuery) return [];
   
-  const client = new GremlinClient(cosmosEndpoint, cosmosKey, 'kt-agent', 'knowledge-graph');
+  // Cosmos DB Gremlin requires the `gremlin` package with WebSocket + SASL auth
+  import Gremlin from "gremlin";
+  const authenticator = new Gremlin.driver.auth.PlainTextSaslAuthenticator(
+    `/dbs/${process.env.COSMOS_GREMLIN_DATABASE}/colls/knowledge-graph`,
+    process.env.COSMOS_GREMLIN_KEY!
+  );
+  const client = new Gremlin.driver.Client(
+    process.env.COSMOS_GREMLIN_ENDPOINT!,
+    {
+      authenticator,
+      traversalsource: "g",
+      mimeType: "application/vnd.gremlin-v2.0+json",
+      rejectUnauthorized: true,
+    }
+  );
   const results = await client.submit(query.graphQuery);
   
-  return results.map(r => ({
+  return results._items.map((r: any) => ({
     entity: r,
-    relationships: r.edges,
+    relationships: r.edges ?? [],
     relevance: calculateGraphRelevance(r, query),
   }));
 }
@@ -265,54 +279,56 @@ function buildAnswerCard(response: AgentResponse): AdaptiveCard {
 
 ### Bot Conversation Flow
 
+> ⚠️ **Important:** Bot Framework SDK v4 (`botbuilder`) was archived by Microsoft with no support after Dec 2025.
+> Use the **Teams SDK** (`@microsoft/teams-ai`) which provides native LLM integration and modern Teams patterns.
+
 ```typescript
-import { TeamsActivityHandler, TurnContext, AdaptiveCardInvokeResponse } from 'botbuilder';
+import { Application, TurnState, AdaptiveCardsOptions } from "@microsoft/teams-ai";
 
-class KTAgentBot extends TeamsActivityHandler {
-  private queryPipeline: QueryPipeline;
-  private interviewAgent: InterviewAgent;
+// Define the bot application using Teams SDK
+const app = new Application<TurnState>({
+  ai: {
+    planner: {
+      // Azure OpenAI configuration for the query agent
+      model: {
+        azureApiKey: process.env.AZURE_OPENAI_KEY!,
+        azureDefaultDeployment: "gpt-4o",
+        azureEndpoint: process.env.AZURE_OPENAI_ENDPOINT!,
+      },
+    },
+  },
+});
 
-  constructor(queryPipeline: QueryPipeline, interviewAgent: InterviewAgent) {
-    super();
-    this.queryPipeline = queryPipeline;
-    this.interviewAgent = interviewAgent;
+// Handle incoming messages — route to interview or query mode
+app.message(/.*/, async (context, state) => {
+  const text = context.activity.text?.trim();
+  const userId = context.activity.from.aadObjectId;
+
+  if (!text) return;
+
+  if (await isInterviewSession(state)) {
+    await interviewAgent.handleMessage(context, state, text);
+  } else {
+    // Default: query mode
+    const userContext = await getUserContext(userId);
+    const response = await queryPipeline.run(text, userContext);
+    const card = buildAnswerCard(response);
+    await context.sendActivity({ attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", content: card }] });
   }
+});
 
-  async onMessage(context: TurnContext): Promise<void> {
-    const text = context.activity.text?.trim();
-    const userId = context.activity.from.aadObjectId;
+// Handle Adaptive Card actions (feedback, follow-ups)
+app.adaptiveCards.actionSubmit("feedback", async (context, state, data) => {
+  await recordFeedback(data.queryId, data.value, context.activity.from.aadObjectId!);
+  return "Thanks for your feedback!";
+});
 
-    if (!text) return;
-
-    // Route based on conversation context
-    if (await this.isInterviewSession(context)) {
-      await this.interviewAgent.handleMessage(context, text);
-    } else {
-      // Default: query mode
-      const userContext = await this.getUserContext(userId);
-      const response = await this.queryPipeline.run(text, userContext);
-      const card = buildAnswerCard(response);
-      await context.sendActivity({ attachments: [CardFactory.adaptiveCard(card)] });
-    }
-  }
-
-  async onAdaptiveCardInvoke(context: TurnContext): Promise<AdaptiveCardInvokeResponse> {
-    const data = context.activity.value?.action?.data;
-
-    switch (data?.type) {
-      case 'feedback':
-        await this.recordFeedback(data.queryId, data.value, context.activity.from.aadObjectId);
-        return { statusCode: 200, type: 'application/vnd.microsoft.activity.message', value: 'Thanks for your feedback!' };
-      
-      case 'follow_up_query':
-        await this.onMessage({ ...context, activity: { ...context.activity, text: data.query } } as TurnContext);
-        return { statusCode: 200, type: undefined, value: undefined };
-      
-      default:
-        return { statusCode: 200, type: undefined, value: undefined };
-    }
-  }
-}
+app.adaptiveCards.actionSubmit("follow_up_query", async (context, state, data) => {
+  const userContext = await getUserContext(context.activity.from.aadObjectId!);
+  const response = await queryPipeline.run(data.query, userContext);
+  const card = buildAnswerCard(response);
+  await context.sendActivity({ attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", content: card }] });
+});
 ```
 
 ## Feedback & Improvement Loop

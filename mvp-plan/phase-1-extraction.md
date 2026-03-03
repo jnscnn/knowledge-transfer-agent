@@ -14,9 +14,10 @@ Create a `infra/` directory with Bicep templates:
 infra/
 ├── main.bicep              # Orchestrator
 ├── modules/
-│   ├── ai-foundry.bicep    # Azure AI Foundry project + model deployments
+│   ├── ai-foundry.bicep    # Azure AI Foundry (ML workspace Hub + Project)
 │   ├── ai-search.bicep     # Azure AI Search (S1 Standard)
-│   ├── cosmos-db.bicep     # Cosmos DB (serverless, NoSQL + Gremlin)
+│   ├── cosmos-nosql.bicep  # Cosmos DB (serverless, NoSQL API) — documents & metadata
+│   ├── cosmos-gremlin.bicep# Cosmos DB (serverless, Gremlin API) — knowledge graph
 │   ├── openai.bicep        # Azure OpenAI (GPT-4o + embeddings)
 │   ├── functions.bicep     # Azure Functions (Node.js 20)
 │   ├── bot-service.bicep   # Azure Bot Service for Teams
@@ -28,19 +29,21 @@ infra/
     └── prod.bicepparam
 ```
 
+> ⚠️ **Important:** Cosmos DB requires two separate accounts because the NoSQL and Gremlin APIs cannot coexist on a single account.
+
 ### Key Configuration
 
 ```bicep
-// Azure OpenAI deployments
-resource gpt4o 'Microsoft.CognitiveServices/accounts/deployments' = {
+// Azure OpenAI deployments (use 'Standard' SKU for data residency compliance)
+resource gpt4o 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   name: 'gpt-4o'
   properties: {
     model: { format: 'OpenAI', name: 'gpt-4o', version: '2024-08-06' }
-    sku: { name: 'GlobalStandard', capacity: 30 } // 30K TPM
+    sku: { name: 'Standard', capacity: 30 } // 30K TPM
   }
 }
 
-resource embedding 'Microsoft.CognitiveServices/accounts/deployments' = {
+resource embedding 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   name: 'text-embedding-3-large'
   properties: {
     model: { format: 'OpenAI', name: 'text-embedding-3-large', version: '1' }
@@ -48,8 +51,14 @@ resource embedding 'Microsoft.CognitiveServices/accounts/deployments' = {
   }
 }
 
-// Cosmos DB - Serverless
-resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts' = {
+// Cosmos DB — TWO separate accounts (NoSQL and Gremlin APIs cannot share an account)
+resource cosmosNoSqlAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
+  properties: {
+    capabilities: [{ name: 'EnableServerless' }]
+    locations: [{ locationName: location, failoverPriority: 0 }]
+  }
+}
+resource cosmosGremlinAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   properties: {
     capabilities: [{ name: 'EnableServerless' }, { name: 'EnableGremlin' }]
     locations: [{ locationName: location, failoverPriority: 0 }]
@@ -57,7 +66,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts' = {
 }
 
 // AI Search - S1 Standard (supports vector + semantic)
-resource searchService 'Microsoft.Search/searchServices' = {
+resource searchService 'Microsoft.Search/searchServices@2024-07-01' = {
   sku: { name: 'standard' } // S1
   properties: { semanticSearch: 'standard' }
 }

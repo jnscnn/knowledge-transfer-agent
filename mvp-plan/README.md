@@ -64,8 +64,8 @@ gantt
 |-----------|-----------|---------------|
 | **Runtime** | Node.js 20+ with TypeScript | Strong Azure SDK support, Bot Framework SDK |
 | **Infrastructure** | Bicep (Azure IaC) | Native Azure, simpler than Terraform for Azure-only |
-| **Agent Framework** | Azure AI Foundry SDK | Built-in tool use, conversation management |
-| **Bot Framework** | Bot Framework SDK v4 + Teams AI Library | Production Teams bot patterns |
+| **Agent Framework** | Azure AI Foundry SDK (`@azure/ai-projects` + `@azure/ai-agents`) | Built-in tool use, conversation management |
+| **Bot Framework** | Teams SDK (Teams AI Library) `@microsoft/teams-ai` | Modern Teams bot framework (Bot Framework SDK v4 is archived) |
 | **Data Pipeline** | Azure Functions (Node.js) | Event-driven, serverless, cost-effective |
 | **LLM** | Azure OpenAI GPT-4o | Best quality for interview + query agents |
 | **Embeddings** | Azure OpenAI text-embedding-3-large | High-quality vectors, 3072 dimensions |

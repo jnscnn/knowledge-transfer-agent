@@ -113,14 +113,14 @@ graph TB
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Observation** | Microsoft Graph API, M365 Copilot | Monitor work patterns, extract from emails/docs/meetings |
-| **Interviews** | Azure AI Foundry | Orchestrate adaptive interview sessions |
+| **Observation** | Microsoft Graph API | Monitor work patterns, extract from emails/docs/meetings |
+| **Interviews** | Azure AI Foundry (`@azure/ai-projects`) | Orchestrate adaptive interview sessions |
 | **Embeddings** | Azure OpenAI Service | Generate text embeddings for semantic search |
 | **Entity Extraction** | Azure AI Language | Named entity recognition (people, processes, systems) |
 | **Vector Search** | Azure AI Search | Hybrid vector + keyword search over knowledge base |
-| **Knowledge Graph** | Azure Cosmos DB (Gremlin API) | Relationship data: people → processes → systems → decisions |
+| **Knowledge Graph** | Azure Cosmos DB (Gremlin API — separate account) | Relationship data: people → processes → systems → decisions |
 | **Documents** | SharePoint / OneDrive | Original artifacts with enriched metadata |
-| **Agent Interface** | Microsoft Bot Framework, Teams | Natural language access for colleagues |
+| **Agent Interface** | Teams SDK (Teams AI Library), Teams | Natural language access for colleagues |
 | **Copilot Integration** | M365 Copilot Plugins | Contextual knowledge surfacing in daily work |
 | **Task Automation** | Power Automate | Autonomous task execution (future phase) |
 | **Identity** | Microsoft Entra ID | Authentication and role-based access control |
@@ -139,6 +139,7 @@ graph TB
 | [Data Model](docs/data-model.md) | Entity relationships and schema design |
 | [Security & Governance](docs/security-governance.md) | Auth, RBAC, consent, compliance |
 | [User Journeys](docs/user-journeys.md) | Retiree, colleague, and admin experiences |
+| [Feasibility Review](docs/feasibility-review.md) | Technical feasibility review with identified issues and fixes |
 | [ADRs](docs/adr/) | Architecture Decision Records |
 | [MVP Plan](mvp-plan/) | Phased implementation plan for building an MVP |
 

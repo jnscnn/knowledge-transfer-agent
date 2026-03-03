@@ -8,10 +8,11 @@ Azure infrastructure for the Knowledge Transfer Agent MVP, defined as Bicep temp
 
 | Resource | SKU/Tier | Estimated Monthly Cost | Purpose |
 |----------|----------|----------------------|---------|
-| Azure AI Foundry | Standard | ~$0 (pay per inference) | Agent orchestration |
+| Azure AI Foundry (Hub + Project) | Standard | ~$0 (pay per inference) | Agent orchestration |
 | Azure OpenAI | Standard | ~$100-300 (usage-based) | GPT-4o + embeddings |
 | Azure AI Search | S1 Standard | ~$250 | Vector + keyword search |
-| Azure Cosmos DB | Serverless | ~$50-100 (usage-based) | Knowledge graph + metadata |
+| Azure Cosmos DB (NoSQL) | Serverless | ~$30-60 (usage-based) | Documents, metadata, conversations |
+| Azure Cosmos DB (Gremlin) | Serverless | ~$20-40 (usage-based) | Knowledge graph |
 | Azure Functions | Consumption | ~$10-30 | Event processing pipeline |
 | Azure Bot Service | Standard | $0 (free tier) | Teams bot registration |
 | Azure Key Vault | Standard | ~$5 | Secrets management |
@@ -19,6 +20,8 @@ Azure infrastructure for the Knowledge Transfer Agent MVP, defined as Bicep temp
 | Application Insights | Pay-as-you-go | ~$10-20 | Monitoring + telemetry |
 | Log Analytics | Pay-as-you-go | ~$10-20 | Audit logs |
 | **Total (estimated)** | | **~$450-750/month** | For MVP pilot |
+
+> **Note:** Cosmos DB requires **two separate accounts** because the NoSQL and Gremlin APIs cannot coexist on a single account. Each account is API-specific.
 
 ## Bicep Template Structure
 
@@ -48,13 +51,24 @@ module keyVault 'modules/key-vault.bicep' = {
   params: { location: location, suffix: suffix, identityId: identity.outputs.managedIdentityId }
 }
 
+module monitoring 'modules/monitoring.bicep' = {
+  name: 'monitoring'
+  params: { location: location, suffix: suffix }
+}
+
 module openai 'modules/openai.bicep' = {
   name: 'openai'
   params: { location: location, suffix: suffix }
 }
 
-module cosmosDb 'modules/cosmos-db.bicep' = {
-  name: 'cosmosDb'
+// Two Cosmos DB accounts: NoSQL API + Gremlin API (cannot coexist on one account)
+module cosmosNoSql 'modules/cosmos-nosql.bicep' = {
+  name: 'cosmosNoSql'
+  params: { location: location, suffix: suffix }
+}
+
+module cosmosGremlin 'modules/cosmos-gremlin.bicep' = {
+  name: 'cosmosGremlin'
   params: { location: location, suffix: suffix }
 }
 
@@ -63,12 +77,26 @@ module aiSearch 'modules/ai-search.bicep' = {
   params: { location: location, suffix: suffix }
 }
 
+// Azure AI Foundry = ML workspace (Hub + Project)
+module aiFoundry 'modules/ai-foundry.bicep' = {
+  name: 'aiFoundry'
+  params: {
+    location: location
+    suffix: suffix
+    keyVaultId: keyVault.outputs.id
+    storageAccountId: identity.outputs.storageAccountId
+    appInsightsId: monitoring.outputs.appInsightsId
+    openaiAccountId: openai.outputs.accountId
+  }
+}
+
 module functions 'modules/functions.bicep' = {
   name: 'functions'
   params: {
     location: location
     suffix: suffix
-    cosmosDbConnectionString: cosmosDb.outputs.connectionString
+    cosmosNoSqlConnectionString: cosmosNoSql.outputs.connectionString
+    cosmosGremlinEndpoint: cosmosGremlin.outputs.gremlinEndpoint
     aiSearchEndpoint: aiSearch.outputs.endpoint
     openaiEndpoint: openai.outputs.endpoint
     keyVaultUri: keyVault.outputs.uri
@@ -81,25 +109,25 @@ module botService 'modules/bot-service.bicep' = {
   params: { location: location, suffix: suffix }
 }
 
-module monitoring 'modules/monitoring.bicep' = {
-  name: 'monitoring'
-  params: { location: location, suffix: suffix }
-}
-
 // Outputs
 output functionAppUrl string = functions.outputs.url
 output botEndpoint string = botService.outputs.endpoint
 output aiSearchEndpoint string = aiSearch.outputs.endpoint
-output cosmosDbEndpoint string = cosmosDb.outputs.endpoint
+output cosmosNoSqlEndpoint string = cosmosNoSql.outputs.endpoint
+output cosmosGremlinEndpoint string = cosmosGremlin.outputs.gremlinEndpoint
+output aiFoundryProjectId string = aiFoundry.outputs.projectId
 ```
 
 ### Azure OpenAI Module (`modules/openai.bicep`)
+
+> ⚠️ **Region note:** GPT-4o and text-embedding-3-large availability varies by region.
+> Check [Azure OpenAI model availability](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) before deploying.
 
 ```bicep
 param location string
 param suffix string
 
-resource openaiAccount 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = {
+resource openaiAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: 'kt-openai-${suffix}'
   location: location
   kind: 'OpenAI'
@@ -110,16 +138,19 @@ resource openaiAccount 'Microsoft.CognitiveServices/accounts@2024-04-01-preview'
   }
 }
 
-resource gpt4o 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
+// Use 'Standard' (regional) by default for data residency compliance.
+// 'GlobalStandard' offers higher availability but routes traffic globally —
+// only use if the customer has no data residency constraints.
+resource gpt4o 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openaiAccount
   name: 'gpt-4o'
-  sku: { name: 'GlobalStandard', capacity: 30 }
+  sku: { name: 'Standard', capacity: 30 }
   properties: {
     model: { format: 'OpenAI', name: 'gpt-4o', version: '2024-08-06' }
   }
 }
 
-resource embedding 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
+resource embedding 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openaiAccount
   name: 'text-embedding-3-large'
   sku: { name: 'Standard', capacity: 120 }
@@ -133,33 +164,31 @@ output endpoint string = openaiAccount.properties.endpoint
 output accountId string = openaiAccount.id
 ```
 
-### Cosmos DB Module (`modules/cosmos-db.bicep`)
+### Cosmos DB NoSQL Module (`modules/cosmos-nosql.bicep`)
+
+> ⚠️ **Important:** Cosmos DB accounts are API-specific. You cannot use both NoSQL and Gremlin on a single account. This requires **two separate accounts**.
 
 ```bicep
 param location string
 param suffix string
 
-resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-02-15-preview' = {
-  name: 'kt-cosmos-${suffix}'
+resource cosmosNoSqlAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
+  name: 'kt-cosmos-nosql-${suffix}'
   location: location
   properties: {
     databaseAccountOfferType: 'Standard'
-    capabilities: [
-      { name: 'EnableServerless' }
-      { name: 'EnableGremlin' }
-    ]
+    capabilities: [{ name: 'EnableServerless' }]
     locations: [{ locationName: location, failoverPriority: 0 }]
     consistencyPolicy: { defaultConsistencyLevel: 'Session' }
   }
 }
 
-resource sqlDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-02-15-preview' = {
-  parent: cosmosAccount
+resource sqlDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
+  parent: cosmosNoSqlAccount
   name: 'kt-agent'
   properties: { resource: { id: 'kt-agent' } }
 }
 
-// NoSQL containers
 var containers = [
   { name: 'retirees', partitionKey: '/id' }
   { name: 'knowledge-chunks', partitionKey: '/retireeId' }
@@ -169,7 +198,7 @@ var containers = [
   { name: 'consent', partitionKey: '/retireeId' }
 ]
 
-resource sqlContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-02-15-preview' = [
+resource sqlContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [
   for container in containers: {
     parent: sqlDatabase
     name: container.name
@@ -182,14 +211,37 @@ resource sqlContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/conta
   }
 ]
 
-// Gremlin database for knowledge graph
-resource gremlinDatabase 'Microsoft.DocumentDB/databaseAccounts/gremlinDatabases@2024-02-15-preview' = {
-  parent: cosmosAccount
+output connectionString string = cosmosNoSqlAccount.listConnectionStrings().connectionStrings[0].connectionString
+output endpoint string = cosmosNoSqlAccount.properties.documentEndpoint
+```
+
+### Cosmos DB Gremlin Module (`modules/cosmos-gremlin.bicep`)
+
+```bicep
+param location string
+param suffix string
+
+resource cosmosGremlinAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
+  name: 'kt-cosmos-graph-${suffix}'
+  location: location
+  properties: {
+    databaseAccountOfferType: 'Standard'
+    capabilities: [
+      { name: 'EnableServerless' }
+      { name: 'EnableGremlin' }
+    ]
+    locations: [{ locationName: location, failoverPriority: 0 }]
+    consistencyPolicy: { defaultConsistencyLevel: 'Session' }
+  }
+}
+
+resource gremlinDatabase 'Microsoft.DocumentDB/databaseAccounts/gremlinDatabases@2024-11-15' = {
+  parent: cosmosGremlinAccount
   name: 'kt-graph'
   properties: { resource: { id: 'kt-graph' } }
 }
 
-resource gremlinGraph 'Microsoft.DocumentDB/databaseAccounts/gremlinDatabases/graphs@2024-02-15-preview' = {
+resource gremlinGraph 'Microsoft.DocumentDB/databaseAccounts/gremlinDatabases/graphs@2024-11-15' = {
   parent: gremlinDatabase
   name: 'knowledge-graph'
   properties: {
@@ -200,8 +252,64 @@ resource gremlinGraph 'Microsoft.DocumentDB/databaseAccounts/gremlinDatabases/gr
   }
 }
 
-output connectionString string = cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString
-output endpoint string = cosmosAccount.properties.documentEndpoint
+output gremlinEndpoint string = 'wss://${cosmosGremlinAccount.name}.gremlin.cosmos.azure.com:443/'
+output endpoint string = cosmosGremlinAccount.properties.documentEndpoint
+```
+
+### Azure AI Foundry Module (`modules/ai-foundry.bicep`)
+
+> **Note:** Azure AI Foundry uses `Microsoft.MachineLearningServices` under the hood.
+> There is no `Microsoft.AIFoundry` resource provider. You need an **AI Hub** (parent) and a **Project** (child).
+
+```bicep
+param location string
+param suffix string
+param keyVaultId string
+param storageAccountId string
+param appInsightsId string
+param openaiAccountId string
+
+// AI Hub — the parent container for AI Foundry projects
+resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = {
+  name: 'kt-ai-hub-${suffix}'
+  location: location
+  kind: 'Hub'
+  sku: { name: 'Basic', tier: 'Basic' }
+  identity: { type: 'SystemAssigned' }
+  properties: {
+    friendlyName: 'KT Agent AI Hub'
+    keyVaultId: keyVaultId
+    storageAccountId: storageAccountId
+    applicationInsightsId: appInsightsId
+  }
+}
+
+// Connect Azure OpenAI as a resource to the hub
+resource openaiConnection 'Microsoft.MachineLearningServices/workspaces/connections@2024-10-01' = {
+  parent: aiHub
+  name: 'kt-openai-connection'
+  properties: {
+    category: 'AzureOpenAI'
+    target: openaiAccountId
+    authType: 'AAD'
+  }
+}
+
+// AI Project — where agents are created and managed
+resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = {
+  name: 'kt-ai-project-${suffix}'
+  location: location
+  kind: 'Project'
+  sku: { name: 'Basic', tier: 'Basic' }
+  identity: { type: 'SystemAssigned' }
+  properties: {
+    friendlyName: 'KT Agent Project'
+    hubResourceId: aiHub.id
+  }
+}
+
+output projectId string = aiProject.id
+output projectEndpoint string = aiProject.properties.discoveryUrl
 ```
 
 ## Deployment Commands
@@ -235,10 +343,11 @@ AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-large
 AZURE_SEARCH_ENDPOINT=https://kt-search-{suffix}.search.windows.net
 AZURE_SEARCH_INDEX=knowledge-chunks
 
-# Cosmos DB
-COSMOS_DB_ENDPOINT=https://kt-cosmos-{suffix}.documents.azure.com:443/
-COSMOS_DB_DATABASE=kt-agent
-COSMOS_GREMLIN_ENDPOINT=wss://kt-cosmos-{suffix}.gremlin.cosmos.azure.com:443/
+# Cosmos DB (two accounts — NoSQL and Gremlin APIs require separate accounts)
+COSMOS_NOSQL_ENDPOINT=https://kt-cosmos-nosql-{suffix}.documents.azure.com:443/
+COSMOS_NOSQL_DATABASE=kt-agent
+COSMOS_GREMLIN_ENDPOINT=wss://kt-cosmos-graph-{suffix}.gremlin.cosmos.azure.com:443/
+COSMOS_GREMLIN_DATABASE=kt-graph
 
 # Azure Functions
 FUNCTION_APP_URL=https://kt-functions-{suffix}.azurewebsites.net

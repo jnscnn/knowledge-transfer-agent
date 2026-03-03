@@ -248,7 +248,10 @@ interface DomainClassification {
 
 ## Cosmos DB Schema Setup
 
-### NoSQL API Collections
+> ⚠️ **Important:** Cosmos DB accounts are API-specific. The NoSQL and Gremlin APIs **cannot** share a single account.
+> This requires two separate Cosmos DB accounts.
+
+### NoSQL API Account (`kt-cosmos-nosql-{suffix}`)
 
 ```typescript
 // Database: kt-agent
@@ -260,7 +263,7 @@ interface DomainClassification {
 
 import { CosmosClient } from '@azure/cosmos';
 
-async function initializeDatabase(client: CosmosClient): Promise<void> {
+async function initializeNoSqlDatabase(client: CosmosClient): Promise<void> {
   const { database } = await client.databases.createIfNotExists({ id: 'kt-agent' });
 
   const containers = [
@@ -281,18 +284,30 @@ async function initializeDatabase(client: CosmosClient): Promise<void> {
 }
 ```
 
-### Gremlin API Setup
+### Gremlin API Account (`kt-cosmos-graph-{suffix}`)
 
-```gremlin
-// Create vertex labels
-g.addV('Person').property('name', 'placeholder').drop()
-g.addV('Process').property('name', 'placeholder').drop()
-g.addV('System').property('name', 'placeholder').drop()
-g.addV('Decision').property('name', 'placeholder').drop()
-g.addV('Workaround').property('name', 'placeholder').drop()
-g.addV('Vendor').property('name', 'placeholder').drop()
-g.addV('Document').property('name', 'placeholder').drop()
-g.addV('KnowledgeDomain').property('name', 'placeholder').drop()
+```typescript
+// Connecting to Cosmos DB Gremlin requires the `gremlin` NPM package
+// with WebSocket + SASL authentication
+
+import Gremlin from "gremlin";
+
+function createGremlinClient(): Gremlin.driver.Client {
+  const authenticator = new Gremlin.driver.auth.PlainTextSaslAuthenticator(
+    `/dbs/kt-graph/colls/knowledge-graph`,
+    process.env.COSMOS_GREMLIN_KEY!
+  );
+  
+  return new Gremlin.driver.Client(
+    process.env.COSMOS_GREMLIN_ENDPOINT!, // wss://kt-cosmos-graph-{suffix}.gremlin.cosmos.azure.com:443/
+    {
+      authenticator,
+      traversalsource: "g",
+      mimeType: "application/vnd.gremlin-v2.0+json",
+      rejectUnauthorized: true,
+    }
+  );
+}
 ```
 
 ## Test Criteria for Phase 2

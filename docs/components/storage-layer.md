@@ -11,9 +11,9 @@ graph TB
         PROF["Profile Index<br/><i>Per-retiree knowledge maps</i>"]
     end
 
-    subgraph "Azure Cosmos DB"
-        GREM["Gremlin API Container<br/><i>Knowledge Graph</i>"]
-        NOSQL["NoSQL API Container<br/><i>Conversations & Metadata</i>"]
+    subgraph "Azure Cosmos DB (two accounts)"
+        GREM["Gremlin API Account<br/><i>Knowledge Graph</i>"]
+        NOSQL["NoSQL API Account<br/><i>Conversations & Metadata</i>"]
     end
 
     subgraph "SharePoint / OneDrive"
@@ -97,6 +97,9 @@ Results are fused using **Reciprocal Rank Fusion (RRF)** with learned weights.
 ## 2. Azure Cosmos DB — Knowledge Graph
 
 Uses the **Gremlin API** to store and query the knowledge graph of entities and their relationships.
+
+> ⚠️ **Important:** The Gremlin API requires a **separate Cosmos DB account** from the NoSQL API.
+> You cannot use both APIs on a single account. The MVP uses two serverless accounts.
 
 ### Vertex Types
 

@@ -4,6 +4,24 @@
 
 This document specifies the Azure AI Foundry agent configurations for the Knowledge Transfer Agent system.
 
+### SDK Packages
+
+| Package | Purpose |
+|---------|---------|
+| `@azure/ai-projects` | Project & resource management, agent lifecycle |
+| `@azure/ai-agents` | Direct agent orchestration and tool use |
+| `@azure/identity` | Authentication (`DefaultAzureCredential`) |
+
+```typescript
+// Initialization pattern
+import { AIProjectClient } from "@azure/ai-projects";
+import { DefaultAzureCredential } from "@azure/identity";
+
+const endpoint = process.env.AZURE_AI_PROJECT_ENDPOINT!;
+const client = new AIProjectClient(endpoint, new DefaultAzureCredential());
+// Access agents via client.agents
+```
+
 ## Agent Definitions
 
 ### Interview Agent
