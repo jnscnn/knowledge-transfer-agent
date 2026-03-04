@@ -1,0 +1,59 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "0.1.0",
+  "id": "{{BOT_ID}}",
+  "developer": {
+    "name": "Knowledge Transfer Agent",
+    "websiteUrl": "https://github.com/jnscnn/knowledge-transfer-agent",
+    "privacyUrl": "https://github.com/jnscnn/knowledge-transfer-agent",
+    "termsOfUseUrl": "https://github.com/jnscnn/knowledge-transfer-agent"
+  },
+  "name": {
+    "short": "KT Agent",
+    "full": "Knowledge Transfer Agent"
+  },
+  "description": {
+    "short": "Ask questions about institutional knowledge from retiring colleagues",
+    "full": "An AI agent that captures and serves institutional knowledge from retiring employees through structured interviews, passive observation, and intelligent Q&A."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#4A90D9",
+  "bots": [
+    {
+      "botId": "{{BOT_ID}}",
+      "scopes": ["personal", "team", "groupChat"],
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            {
+              "title": "ask",
+              "description": "Ask a question about institutional knowledge"
+            },
+            {
+              "title": "interview start",
+              "description": "Start a knowledge capture interview"
+            },
+            {
+              "title": "interview end",
+              "description": "End the current interview session"
+            },
+            {
+              "title": "progress",
+              "description": "View knowledge capture progress"
+            },
+            {
+              "title": "help",
+              "description": "Show available commands"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "validDomains": []
+}

@@ -160,6 +160,76 @@ This repository contains architecture documentation and an MVP implementation pl
 - Microsoft Entra ID for identity management
 - Node.js 20+ / Python 3.11+ (language TBD in MVP phase)
 
+## Development Setup
+
+### Prerequisites
+- Node.js 20+
+- Azure subscription with the following resources (see [Infrastructure](infra/README.md))
+- Microsoft 365 tenant for Teams bot testing
+
+### Quick Start
+
+1. Clone the repository:
+```bash
+git clone https://github.com/jnscnn/knowledge-transfer-agent.git
+cd knowledge-transfer-agent
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Deploy Azure infrastructure:
+```bash
+az group create --name kt-agent-rg --location eastus2
+az deployment group create \
+  --resource-group kt-agent-rg \
+  --template-file infra/main.bicep \
+  --parameters infra/parameters/dev.bicepparam
+```
+
+4. Copy environment variables:
+```bash
+cp .env.example .env
+# Fill in values from Azure deployment outputs
+```
+
+5. Initialize storage:
+```bash
+npm run setup:search-index
+npm run setup:cosmos
+```
+
+6. Start the bot:
+```bash
+npm run dev
+```
+
+7. Run tests:
+```bash
+npm test
+```
+
+### Project Structure
+
+```
+src/
+├── shared/          # Types, config, errors, retry, logging
+├── storage/         # Cosmos DB, AI Search, Gremlin clients
+├── pipeline/        # Chunking, embedding, entity extraction, indexing
+├── agents/
+│   ├── interview/   # Interview agent (knowledge capture)
+│   └── query/       # Query agent (RAG pipeline)
+├── graph/           # Microsoft Graph API observer
+├── bot/             # Teams bot (cards, handlers, manifest)
+└── index.ts         # Application entry point
+
+functions/           # Azure Functions (event processing)
+infra/               # Bicep templates (Azure infrastructure)
+tests/               # Unit and integration tests
+```
+
 ## Contributing
 
 This is an open architecture proposal. Feedback, suggestions, and contributions are welcome:

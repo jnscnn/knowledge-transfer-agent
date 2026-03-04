@@ -1,0 +1,25 @@
+{
+  "name": "kt-agent-functions",
+  "version": "0.1.0",
+  "description": "Azure Functions for Knowledge Transfer Agent event processing",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "func start",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.6.0",
+    "@azure/cosmos": "^4.2.0",
+    "@azure/identity": "^4.6.0",
+    "@azure/search-documents": "^12.1.0",
+    "@azure/openai": "^3.0.0-beta.1",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "gremlin": "^3.7.3",
+    "isomorphic-fetch": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.0"
+  }
+}
