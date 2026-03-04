@@ -106,7 +106,7 @@ graph TB
 
     subgraph "⚙️ Processing Layer"
         CE[Chunking & Embedding<br/><i>Azure OpenAI Service</i>]
-        EE[Entity Extraction<br/><i>GPT-4o Structured Output</i>]
+        EE[Entity Extraction<br/><i>LLM Structured Output</i>]
         KGB[Knowledge Graph Builder<br/><i>Cosmos DB Gremlin</i>]
     end
 
@@ -176,7 +176,7 @@ graph TB
 | **Runtime** | Node.js 20+ / TypeScript (strict) | Application code, Azure SDK support |
 | **Interviews** | Azure AI Foundry (`@azure/ai-projects`) | Orchestrate adaptive interview sessions with function tools |
 | **Observation** | Microsoft Graph API | Monitor email, calendar, and document patterns |
-| **LLM** | Azure OpenAI GPT-4o | Interview agent, query agent, entity extraction, domain classification |
+| **LLM** | Azure OpenAI (configurable model) | Interview agent, query agent, entity extraction, domain classification |
 | **Embeddings** | Azure OpenAI text-embedding-3-large | 3072-dimensional vectors for semantic search |
 | **Vector Search** | Azure AI Search (S1) | Hybrid vector + keyword search with semantic reranking |
 | **Knowledge Graph** | Azure Cosmos DB (Gremlin API) | Entity relationships: people → processes → systems → decisions |
@@ -268,6 +268,8 @@ Fill in the values from the deployment outputs. Key variables:
 | Variable | Where to find it |
 |----------|-----------------|
 | `AZURE_OPENAI_ENDPOINT` | Azure Portal → OpenAI resource → Keys and Endpoint |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Name of your chat model deployment (e.g., `gpt-4o`, `gpt-4.1`) |
+| `AZURE_OPENAI_AUXILIARY_DEPLOYMENT` | Optional: cheaper model for entity extraction (defaults to chat model) |
 | `COSMOS_NOSQL_ENDPOINT` | Azure Portal → Cosmos DB (NoSQL) → Keys |
 | `COSMOS_GREMLIN_ENDPOINT` | Azure Portal → Cosmos DB (Gremlin) → Keys |
 | `AZURE_SEARCH_ENDPOINT` | Azure Portal → AI Search → Overview |
@@ -310,7 +312,7 @@ The `infra/` directory contains 12 modular Bicep templates that deploy everythin
 
 | Resource | SKU | Purpose |
 |----------|-----|---------|
-| Azure OpenAI | S0 (Standard) | GPT-4o (30K TPM) + text-embedding-3-large (120K TPM) |
+| Azure OpenAI | S0 (Standard) | Chat model (30K TPM) + embedding model (120K TPM) |
 | Azure AI Search | S1 Standard | Hybrid vector + keyword search with semantic reranking |
 | Cosmos DB (NoSQL) | Serverless | Interview sessions, knowledge chunks, observations, feedback |
 | Cosmos DB (Gremlin) | Serverless | Knowledge graph (entities and relationships) |
@@ -321,6 +323,42 @@ The `infra/` directory contains 12 modular Bicep templates that deploy everythin
 | Application Insights | Pay-as-you-go | Monitoring and telemetry |
 
 **Estimated cost: ~$450–750/month** for a dev/pilot environment (mostly AI Search S1 at ~$250 and Azure OpenAI usage).
+
+## Model Configuration
+
+The architecture is **model-agnostic** — you can swap the chat and embedding models via environment variables without changing code. The Bicep templates also accept model parameters.
+
+### Two deployment tiers
+
+| Tier | Env var | Used for | Default |
+|------|---------|----------|---------|
+| **Chat** | `AZURE_OPENAI_CHAT_DEPLOYMENT` | Interviews, query answers, complex reasoning | `gpt-4o` |
+| **Auxiliary** | `AZURE_OPENAI_AUXILIARY_DEPLOYMENT` | Entity extraction, sensitivity classification, domain classification | Same as chat |
+| **Embedding** | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Vector embeddings (set `AZURE_OPENAI_EMBEDDING_DIMENSIONS` too) | `text-embedding-3-large` (3072 dims) |
+
+Split the auxiliary tier to a cheaper model (e.g., `gpt-4o-mini`) for cost optimization — bulk extraction tasks don't need the same model quality as interactive conversations.
+
+### Swapping models
+
+```bash
+# Use GPT-4.1 for conversations, GPT-4o-mini for bulk extraction
+AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4.1
+AZURE_OPENAI_AUXILIARY_DEPLOYMENT=gpt-4o-mini
+
+# Use a smaller embedding model (update dimensions accordingly)
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+AZURE_OPENAI_EMBEDDING_DIMENSIONS=1536
+```
+
+To deploy with a different model in Bicep:
+
+```bash
+az deployment group create \
+  --resource-group kt-agent-rg \
+  --template-file infra/main.bicep \
+  --parameters infra/parameters/dev.bicepparam \
+  --parameters chatModelName=gpt-4.1 chatModelVersion=2025-04-14
+```
 
 ## Entra ID App Registrations
 

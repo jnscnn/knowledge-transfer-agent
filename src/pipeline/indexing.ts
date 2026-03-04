@@ -19,17 +19,20 @@ export class IndexingService {
   private cosmosClient: CosmosNoSqlClient;
   private gremlinClient: CosmosGremlinClient;
   private embeddingService: EmbeddingService;
+  private auxiliaryDeployment: string;
 
   constructor(
     searchService: SearchClientWrapper,
     cosmosClient: CosmosNoSqlClient,
     gremlinClient: CosmosGremlinClient,
     embeddingService: EmbeddingService,
+    auxiliaryDeployment?: string,
   ) {
     this.searchService = searchService;
     this.cosmosClient = cosmosClient;
     this.gremlinClient = gremlinClient;
     this.embeddingService = embeddingService;
+    this.auxiliaryDeployment = auxiliaryDeployment ?? 'gpt-4o';
   }
 
   async indexChunk(chunk: KnowledgeChunk): Promise<void> {
@@ -103,13 +106,13 @@ export class IndexingService {
     const chunker = new TextChunker();
     const entityExtractor = new EntityExtractor(
       this.embeddingService['client'].baseURL.replace('/openai', ''),
-      'gpt-4o',
+      this.auxiliaryDeployment,
     );
     const relationshipExtractor = new RelationshipExtractor(this.gremlinClient);
     const qualityScorer = new QualityScorer();
     const sensitivityClassifier = new SensitivityClassifier(
       this.embeddingService['client'].baseURL.replace('/openai', ''),
-      'gpt-4o',
+      this.auxiliaryDeployment,
     );
 
     try {

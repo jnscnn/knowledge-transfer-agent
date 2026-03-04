@@ -50,10 +50,13 @@ export function getSearchConfig(): { endpoint: string; apiKey: string; indexName
   };
 }
 
-export function getOpenAIConfig(): { endpoint: string; deployment: string } {
+export function getOpenAIConfig(): { endpoint: string; chatDeployment: string; auxiliaryDeployment: string; embeddingDeployment: string } {
+  const chatDeployment = optionalEnv('AZURE_OPENAI_CHAT_DEPLOYMENT', optionalEnv('AZURE_OPENAI_GPT4O_DEPLOYMENT', 'gpt-4o'));
   return {
     endpoint: requireEnv('AZURE_OPENAI_ENDPOINT'),
-    deployment: optionalEnv('AZURE_OPENAI_GPT4O_DEPLOYMENT', 'gpt-4o'),
+    chatDeployment,
+    auxiliaryDeployment: optionalEnv('AZURE_OPENAI_AUXILIARY_DEPLOYMENT', chatDeployment),
+    embeddingDeployment: optionalEnv('AZURE_OPENAI_EMBEDDING_DEPLOYMENT', 'text-embedding-3-large'),
   };
 }
 

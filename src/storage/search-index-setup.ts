@@ -7,7 +7,7 @@ import {
 import { logger } from '../shared/logger.js';
 
 const INDEX_NAME = 'knowledge-chunks';
-const VECTOR_DIMS = 3072;
+const VECTOR_DIMS = parseInt(process.env['AZURE_OPENAI_EMBEDDING_DIMENSIONS'] ?? '3072', 10);
 
 function buildIndexDefinition(): SearchIndex {
   return {

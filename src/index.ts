@@ -41,6 +41,8 @@ async function main(): Promise<void> {
   const embeddingService = new EmbeddingService(
     config.openai.endpoint,
     config.openai.embeddingDeployment,
+    config.openai.chatDeployment,
+    config.openai.embeddingDimensions,
   );
 
   // ── Agent initialization ──
@@ -48,6 +50,7 @@ async function main(): Promise<void> {
   const interviewAgent = new InterviewAgent({
     projectEndpoint: config.openai.endpoint,
     cosmosClient,
+    chatDeployment: config.openai.chatDeployment,
   });
 
   const queryAgent = new QueryAgent({
@@ -56,7 +59,7 @@ async function main(): Promise<void> {
     gremlinClient,
     embeddingService,
     openaiEndpoint: config.openai.endpoint,
-    deploymentName: config.openai.gpt4oDeployment,
+    deploymentName: config.openai.chatDeployment,
   });
 
   // ── Bot setup ──

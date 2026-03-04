@@ -5,8 +5,10 @@ const configSchema = z.object({
   openai: z.object({
     endpoint: z.string().url(),
     apiKey: z.string().min(1),
-    gpt4oDeployment: z.string().min(1),
+    chatDeployment: z.string().min(1),
+    auxiliaryDeployment: z.string().min(1),
     embeddingDeployment: z.string().min(1),
+    embeddingDimensions: z.coerce.number().int().positive().default(3072),
   }),
   search: z.object({
     endpoint: z.string().url(),
@@ -45,8 +47,10 @@ function loadConfig(): AppConfig {
     openai: {
       endpoint: process.env['AZURE_OPENAI_ENDPOINT'] ?? '',
       apiKey: process.env['AZURE_OPENAI_API_KEY'] ?? '',
-      gpt4oDeployment: process.env['AZURE_OPENAI_GPT4O_DEPLOYMENT'] ?? 'gpt-4o',
+      chatDeployment: process.env['AZURE_OPENAI_CHAT_DEPLOYMENT'] ?? process.env['AZURE_OPENAI_GPT4O_DEPLOYMENT'] ?? 'gpt-4o',
+      auxiliaryDeployment: process.env['AZURE_OPENAI_AUXILIARY_DEPLOYMENT'] ?? process.env['AZURE_OPENAI_CHAT_DEPLOYMENT'] ?? process.env['AZURE_OPENAI_GPT4O_DEPLOYMENT'] ?? 'gpt-4o',
       embeddingDeployment: process.env['AZURE_OPENAI_EMBEDDING_DEPLOYMENT'] ?? 'text-embedding-3-large',
+      embeddingDimensions: process.env['AZURE_OPENAI_EMBEDDING_DIMENSIONS'] ?? 3072,
     },
     search: {
       endpoint: process.env['AZURE_SEARCH_ENDPOINT'] ?? '',

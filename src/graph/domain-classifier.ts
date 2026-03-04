@@ -1,4 +1,4 @@
-// Use GPT-4o to classify observed activity into knowledge domains
+// Classify observed activity into knowledge domains using LLM
 
 import { AzureOpenAI } from 'openai';
 import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';

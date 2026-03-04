@@ -1,7 +1,7 @@
 /**
  * HyDE (Hypothetical Document Embedding) prompt template.
  *
- * Generates a prompt that asks GPT-4o to write a hypothetical paragraph
+ * Generates a prompt that asks the LLM to write a hypothetical paragraph
  * that would appear in the knowledge base as the ideal answer.
  */
 

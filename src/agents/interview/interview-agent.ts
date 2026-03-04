@@ -142,6 +142,7 @@ export class InterviewAgent {
   private readonly sessionManager: SessionManager;
   private readonly questionGenerator: QuestionGenerator;
   private readonly systemPrompt: string;
+  private readonly chatDeployment: string;
 
   /** Maps sessionId → AI Foundry agent + thread state */
   private readonly agentStates = new Map<string, AgentState>();
@@ -154,16 +155,18 @@ export class InterviewAgent {
   constructor(options: {
     projectEndpoint: string;
     cosmosClient: CosmosNoSqlClient;
+    chatDeployment?: string;
   }) {
     this.projectClient = new AIProjectClient(
       options.projectEndpoint,
       new DefaultAzureCredential(),
     );
     this.cosmosClient = options.cosmosClient;
+    this.chatDeployment = options.chatDeployment ?? 'gpt-4o';
     this.sessionManager = new SessionManager(options.cosmosClient);
     this.questionGenerator = new QuestionGenerator(
       options.projectEndpoint,
-      'gpt-4o',
+      this.chatDeployment,
     );
 
     this.systemPrompt = this.loadSystemPrompt();
@@ -568,7 +571,7 @@ export class InterviewAgent {
 
     const agent = await withRetry(
       () =>
-        this.projectClient.agents.createAgent('gpt-4o', {
+        this.projectClient.agents.createAgent(this.chatDeployment, {
           name: `interview-agent-${sessionId}`,
           instructions: this.systemPrompt,
           tools: TOOL_DEFINITIONS,

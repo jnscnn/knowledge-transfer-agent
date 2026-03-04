@@ -1,4 +1,4 @@
-// Entity extraction using GPT-4o
+// Entity extraction using LLM structured output
 
 import { AzureOpenAI } from 'openai';
 import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
@@ -142,7 +142,7 @@ export class EntityExtractor {
           throw new AzureServiceError(
             'AzureOpenAI',
             'extractEntities',
-            'No content in GPT-4o response',
+            'No content in chat completion response',
           );
         }
         return content;

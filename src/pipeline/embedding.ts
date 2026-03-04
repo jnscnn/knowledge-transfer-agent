@@ -13,9 +13,13 @@ const AZURE_OPENAI_SCOPE = 'https://cognitiveservices.azure.com/.default';
 export class EmbeddingService {
   private client: AzureOpenAI;
   private deploymentName: string;
+  private chatDeployment: string;
+  private dimensions: number;
 
-  constructor(endpoint: string, deploymentName: string) {
+  constructor(endpoint: string, deploymentName: string, chatDeployment?: string, dimensions?: number) {
     this.deploymentName = deploymentName;
+    this.chatDeployment = chatDeployment ?? 'gpt-4o';
+    this.dimensions = dimensions ?? EMBEDDING_DIMENSIONS;
 
     const credential = new DefaultAzureCredential();
     const azureADTokenProvider = getBearerTokenProvider(credential, AZURE_OPENAI_SCOPE);
@@ -49,7 +53,7 @@ export class EmbeddingService {
           const response = await this.client.embeddings.create({
             model: this.deploymentName,
             input: batch,
-            dimensions: EMBEDDING_DIMENSIONS,
+            dimensions: this.dimensions,
           });
           return response.data.map((item) => item.embedding);
         },
@@ -74,11 +78,11 @@ export class EmbeddingService {
       question,
     });
 
-    // Generate a hypothetical answer paragraph using GPT-4o
+    // Generate a hypothetical answer paragraph using the chat model
     const hypotheticalAnswer = await withRetry(
       async () => {
         const response = await this.client.chat.completions.create({
-          model: 'gpt-4o',
+          model: this.chatDeployment,
           messages: [
             {
               role: 'system',
@@ -101,7 +105,7 @@ export class EmbeddingService {
           throw new AzureServiceError(
             'AzureOpenAI',
             'embedWithHyde',
-            'No content in GPT-4o response',
+            'No content in chat completion response',
           );
         }
         return content;
